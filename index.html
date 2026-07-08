@@ -1,0 +1,1131 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>금융자산 포트폴리오</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+
+:root{
+  --bg:#0E0E0E; --card:#181818;
+  --border:#252525; --border2:#2E2E2E;
+  --blue:#4A9EFF;   --blue-d:rgba(74,158,255,.10);
+  --teal:#2ECFBD;   --teal-d:rgba(46,207,189,.10);
+  --green:#4ADE80;  --green-d:rgba(74,222,128,.09);
+  --purple:#A78BFA; --purple-d:rgba(167,139,250,.10);
+  --amber:#F59E0B;  --amber-d:rgba(245,158,11,.10);
+  --slate:#94A3B8;  --slate-d:rgba(148,163,184,.10);
+  --red:#F87171;
+  --w100:#FFF; --w70:rgba(255,255,255,.7); --w50:rgba(255,255,255,.5);
+  --w30:rgba(255,255,255,.3); --w12:rgba(255,255,255,.07); --w06:rgba(255,255,255,.04);
+}
+
+html,body{
+  height:100%; overflow:hidden;
+  font-family:'Inter',-apple-system,BlinkMacSystemFont,'Apple SD Gothic Neo',sans-serif;
+  background:var(--bg); color:var(--w100);
+  -webkit-font-smoothing:antialiased; font-size:13px;
+}
+
+/* ══ GRID ══
+   cols: [inp 240px] [A] [B] [C]
+   rows: [hdr 52px] [row2 1fr] [row3 150px] [row4 100px]
+   A spans rows 2-3 (tall card with detail panel)
+*/
+.db{
+  width:100vw; height:100vh;
+  display:grid;
+  grid-template-columns:28px 1fr 1fr 1fr;
+  transition:grid-template-columns .3s cubic-bezier(.4,0,.2,1);
+  grid-template-rows:52px 1fr 240px 106px;
+  gap:7px; padding:9px;
+}
+.g-hdr  {grid-column:1/-1; grid-row:1;}
+.g-inp  {grid-column:1;    grid-row:2/span 3;}
+.g-A    {grid-column:2;    grid-row:2/span 2;}  /* A tall: row2+row3 */
+.g-B    {grid-column:3;    grid-row:2;}
+.g-C    {grid-column:4;    grid-row:2;}
+.g-D    {grid-column:3;    grid-row:3;}
+.g-F    {grid-column:4;    grid-row:3;}
+.g-E    {grid-column:2/-1; grid-row:4;}
+
+
+/* ══ SIDEBAR DRAWER ══ */
+/* 사이드바 카드 — overflow hidden 필수 */
+.g-inp{
+  overflow:hidden;
+  padding:0;          /* 닫혔을 때 탭만 보임 */
+  position:relative;
+}
+
+/* 탭 버튼 — 항상 노출, 오른쪽 엣지 */
+.sidebar-tab{
+  position:absolute;
+  top:50%; right:0;
+  transform:translateY(-50%);
+  width:28px; height:56px;
+  background:var(--card);
+  border:1px solid var(--border);
+  border-radius:10px 0 0 10px;
+  display:flex; flex-direction:column;
+  align-items:center; justify-content:center; gap:3px;
+  cursor:pointer; z-index:10;
+  transition:background .2s;
+  flex-shrink:0;
+}
+.sidebar-tab:hover{background:#222;}
+.sidebar-tab-icon{
+  font-size:12px; line-height:1;
+  transition:transform .3s;
+}
+.sidebar-tab-label{
+  font-size:7.5px; font-weight:700;
+  letter-spacing:.08em; text-transform:uppercase;
+  color:var(--w30); writing-mode:vertical-rl;
+  text-orientation:mixed;
+  white-space:nowrap;
+}
+
+/* 내부 콘텐츠 — 열렸을 때만 보임 */
+.sidebar-inner{
+  position:absolute;
+  inset:0; right:0;
+  padding:12px 14px;
+  display:flex; flex-direction:column; gap:6px;
+  opacity:0; pointer-events:none;
+  transition:opacity .25s .05s;
+  overflow:hidden;
+}
+
+/* 열린 상태 */
+body.sidebar-open .db{
+  grid-template-columns:240px 1fr 1fr 1fr;
+}
+body.sidebar-open .sidebar-inner{
+  opacity:1; pointer-events:all;
+}
+body.sidebar-open .sidebar-tab{
+  border-radius:0 8px 8px 0;
+  right:-1px;
+}
+body.sidebar-open .sidebar-tab-icon{
+  transform:rotate(180deg);
+}
+
+/* ── CARD ── */
+.card{
+  background:var(--card); border:1px solid var(--border);
+  border-radius:12px; padding:12px 14px;
+  position:relative; overflow:hidden;
+  display:flex; flex-direction:column; gap:6px; min-height:0;
+}
+.eye{font-size:9px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--w30);flex-shrink:0;}
+
+/* glows */
+.gb::before{content:'';position:absolute;top:-50px;right:-50px;width:150px;height:150px;border-radius:50%;background:radial-gradient(circle,rgba(74,158,255,.07) 0%,transparent 70%);pointer-events:none;}
+.gt::before{content:'';position:absolute;top:-50px;right:-50px;width:150px;height:150px;border-radius:50%;background:radial-gradient(circle,rgba(46,207,189,.07) 0%,transparent 70%);pointer-events:none;}
+.gp::before{content:'';position:absolute;top:-50px;right:-50px;width:150px;height:150px;border-radius:50%;background:radial-gradient(circle,rgba(167,139,250,.07) 0%,transparent 70%);pointer-events:none;}
+.ga::before{content:'';position:absolute;top:-50px;right:-50px;width:150px;height:150px;border-radius:50%;background:radial-gradient(circle,rgba(245,158,11,.07) 0%,transparent 70%);pointer-events:none;}
+
+/* ══ HEADER ══ */
+.hdr{display:flex;align-items:center;justify-content:space-between;padding:0 2px;}
+.hdr-l{display:flex;align-items:center;gap:10px;}
+.hdr-eye{font-size:9.5px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:var(--teal);}
+.hdr-ttl{font-size:17px;font-weight:600;letter-spacing:-.02em;}
+.hdr-ttl span{font-weight:300;color:var(--w50);}
+
+/* 금액 토글 — 타이틀 인라인 */
+#amt-toggle{
+  display:inline-flex;align-items:center;gap:7px;
+  background:#1E1E1E;border:1px solid #383838;
+  border-radius:22px;padding:4px 12px 4px 8px;
+  cursor:pointer;user-select:none;
+  transition:border-color .2s,background .2s;
+  margin-left:12px;vertical-align:middle;
+}
+#amt-toggle:hover{border-color:#555;background:#252525;}
+#toggle-icon{font-size:13px;}
+#toggle-switch{
+  width:32px;height:18px;border-radius:99px;
+  background:#2E2E2E;border:1px solid #444;
+  position:relative;flex-shrink:0;
+  transition:background .25s,border-color .25s;
+}
+#toggle-switch::after{
+  content:'';position:absolute;top:2px;left:2px;
+  width:12px;height:12px;border-radius:50%;background:#555;
+  transition:transform .25s cubic-bezier(.34,1.56,.64,1),background .25s;
+}
+#amt-toggle.on #toggle-switch{background:rgba(46,207,189,.25);border-color:var(--teal);}
+#amt-toggle.on #toggle-switch::after{transform:translateX(14px);background:var(--teal);}
+#toggle-label{font-size:10.5px;font-weight:500;color:var(--w50);white-space:nowrap;}
+#amt-toggle.on #toggle-label{color:var(--teal);}
+
+.hdr-r{display:flex;align-items:center;gap:5px;}
+.pill{font-size:10.5px;font-weight:500;padding:3px 10px;border-radius:20px;background:var(--w12);border:1px solid var(--border2);color:var(--w50);}
+.pill b{color:var(--w70);font-weight:600;}
+.pill.teal{background:var(--teal-d);border-color:rgba(46,207,189,.22);color:var(--teal);}
+.pill.amber{background:var(--amber-d);border-color:rgba(245,158,11,.22);color:var(--amber);}
+
+/* ══ AMOUNT BLUR — body.hide 클래스로 제어 ══ */
+body.hide .blur-amt{filter:blur(7px);user-select:none;transition:filter .3s;}
+body:not(.hide) .blur-amt{filter:none;transition:filter .3s;}
+
+/* ══ INPUT PANEL ══ */
+.inp-scroll{flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:9px;}
+.inp-scroll::-webkit-scrollbar{width:3px;}
+.inp-scroll::-webkit-scrollbar-thumb{background:var(--border2);border-radius:99px;}
+.inp-sec-lbl{font-size:8.5px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--w30);padding-bottom:5px;border-bottom:1px solid var(--border);}
+.inp-row{display:flex;flex-direction:column;gap:2px;}
+.inp-lbl{font-size:10.5px;color:var(--w50);}
+.inp-lbl small{font-size:9px;color:var(--w30);margin-left:3px;}
+.inp-field{
+  width:100%;padding:6px 9px;
+  background:var(--w12);border:1px solid var(--border2);
+  border-radius:7px;color:var(--w100);font-size:12px;
+  font-family:inherit;font-variant-numeric:tabular-nums;
+  outline:none;transition:border-color .15s;
+}
+.inp-field:focus{border-color:var(--blue);}
+.inp-field.c-teal:focus{border-color:var(--teal);}
+.inp-field.c-amber:focus{border-color:var(--amber);}
+.inp-field.c-purple:focus{border-color:var(--purple);}
+.inp-calc{
+  width:100%;padding:6px 9px;border-radius:7px;font-size:12px;
+  font-variant-numeric:tabular-nums;font-family:inherit;
+  background:var(--teal-d);border:1px solid rgba(46,207,189,.2);color:var(--teal);
+}
+.reset-btn{
+  width:100%;padding:7px;border-radius:7px;
+  background:var(--w12);border:1px solid var(--border2);
+  color:var(--w50);font-size:10.5px;font-family:inherit;
+  cursor:pointer;transition:background .15s;flex-shrink:0;
+}
+.reset-btn:hover{background:rgba(255,255,255,.1);border-color:var(--w50);}
+
+/* ══ A CARD — TALL with detail panel ══ */
+.a-top{
+  display:flex;gap:10px;align-items:flex-start;flex-shrink:0;
+}
+.donut-box{position:relative;flex-shrink:0;width:100px;height:100px;}
+.donut-box svg{width:100%;height:100%;}
+.donut-mid{
+  position:absolute;inset:0;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;text-align:center;pointer-events:none;
+}
+.dm-lbl{font-size:8px;color:var(--w30);letter-spacing:.08em;text-transform:uppercase;}
+.dm-val{font-size:14px;font-weight:600;color:var(--w100);}
+.dm-sub{font-size:8px;color:var(--w30);margin-top:1px;}
+
+.leg{display:flex;flex-direction:column;gap:4px;flex:1;}
+.leg-row{
+  display:flex;align-items:center;gap:6px;
+  padding:4px 6px;border-radius:7px;
+  cursor:pointer;transition:background .15s;
+}
+.leg-row:hover{background:rgba(255,255,255,.06);}
+.leg-row.active{background:rgba(255,255,255,.08);border:1px solid var(--border2);}
+.leg-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;}
+.leg-name{font-size:11px;color:var(--w50);flex:1;}
+.leg-pct{font-size:11.5px;font-weight:600;font-variant-numeric:tabular-nums;min-width:36px;text-align:right;}
+.leg-amt{font-size:9.5px;color:var(--w30);font-variant-numeric:tabular-nums;}
+
+.a-total{
+  padding:6px 8px;border-radius:7px;flex-shrink:0;
+  background:var(--w12);border:1px solid var(--border2);
+  display:flex;justify-content:space-between;align-items:baseline;
+}
+.a-total-lbl{font-size:10px;color:var(--w30);}
+.a-total-val{font-size:12.5px;font-weight:600;font-variant-numeric:tabular-nums;}
+.a-total-aud{font-size:9px;color:var(--w30);}
+
+/* Detail panel — slides in below */
+.a-detail{
+  flex:1;min-height:0;overflow:hidden;
+  border-top:1px solid var(--border);
+  padding-top:8px;
+  display:flex;flex-direction:column;gap:5px;
+}
+.a-detail-title{
+  font-size:9px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--w30);flex-shrink:0;
+}
+.a-detail-body{flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:4px;}
+.a-detail-body::-webkit-scrollbar{width:2px;}
+.a-detail-body::-webkit-scrollbar-thumb{background:var(--border2);}
+.det-row{
+  display:flex;align-items:center;gap:8px;
+  padding:7px 9px;border-radius:8px;
+  background:var(--w06);border:1px solid var(--border2);
+  flex-shrink:0;
+}
+.det-icon{font-size:14px;width:26px;height:26px;border-radius:7px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.det-info{flex:1;min-width:0;}
+.det-name{font-size:11.5px;font-weight:500;color:var(--w100);}
+.det-desc{font-size:9.5px;color:var(--w50);margin-top:1px;}
+.det-r{text-align:right;flex-shrink:0;}
+.det-amt{font-size:12px;font-weight:600;font-variant-numeric:tabular-nums;}
+.det-pct{font-size:9.5px;color:var(--w30);}
+.det-aud{font-size:8.5px;color:rgba(255,255,255,.2);}
+.det-bar-wrap{margin-top:4px;}
+.det-bar{height:3px;background:var(--border2);border-radius:99px;overflow:hidden;}
+.det-bar-fill{height:100%;border-radius:99px;}
+.det-note{
+  padding:8px 10px;border-radius:8px;flex-shrink:0;
+  font-size:10.5px;color:var(--w50);line-height:1.55;
+}
+.det-note b{color:var(--w70);font-weight:600;}
+
+/* tag */
+.tag{display:inline-block;font-size:9px;font-weight:600;padding:2px 7px;border-radius:20px;}
+.tag-b{background:var(--blue-d);color:var(--blue);border:1px solid rgba(74,158,255,.2);}
+.tag-t{background:var(--teal-d);color:var(--teal);border:1px solid rgba(46,207,189,.2);}
+.tag-a{background:var(--amber-d);color:var(--amber);border:1px solid rgba(245,158,11,.2);}
+.tag-p{background:var(--purple-d);color:var(--purple);border:1px solid rgba(167,139,250,.2);}
+.tag-s{background:var(--slate-d);color:var(--slate);border:1px solid rgba(148,163,184,.2);}
+
+/* ══ B REBALANCE ══ */
+.ba-wrap{display:grid;grid-template-columns:1fr 18px 1fr;gap:4px;flex:1;min-height:0;align-items:start;}
+.ba-col{display:flex;flex-direction:column;gap:0;}
+.ba-lbl{font-size:8.5px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--w30);margin-bottom:3px;}
+.ba-lbl.after{color:var(--teal);}
+.ba-arr{display:flex;align-items:center;justify-content:center;padding-top:10px;}
+.ba-arr svg{width:13px;height:13px;stroke:var(--teal);}
+.ba-row{display:flex;flex-direction:column;gap:1px;margin-bottom:2px;}
+.ba-top{display:flex;justify-content:space-between;font-size:10.5px;}
+.ba-n{color:var(--w50);}
+.ba-p{font-weight:600;font-variant-numeric:tabular-nums;}
+.ba-track{height:2px;background:var(--w12);border-radius:99px;overflow:hidden;}
+.ba-fill{height:100%;border-radius:99px;transition:width .4s ease;}
+.rebal-box{padding:5px 8px;border-radius:8px;flex-shrink:0;background:var(--w12);border:1px solid var(--border2);}
+.rebal-eye{font-size:8.5px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--w30);margin-bottom:3px;}
+.r3{display:grid;grid-template-columns:repeat(3,1fr);text-align:center;gap:3px;}
+.r3-l{font-size:8.5px;color:var(--w30);margin-bottom:2px;}
+.r3-v{font-size:10.5px;font-weight:600;font-variant-numeric:tabular-nums;}
+.r3-s{font-size:8.5px;color:var(--w30);}
+.rebal-key{
+  padding:5px 8px;border-radius:7px;flex-shrink:0;
+  background:var(--teal-d);border:1px solid rgba(46,207,189,.18);
+  font-size:9.5px;color:var(--w50);line-height:1.35;
+}
+.rebal-key b{color:var(--teal);}
+
+/* ══ C FLOW ══ */
+.flow-cols{display:grid;grid-template-columns:1fr 1px 1fr;gap:7px;flex:1;min-height:0;}
+.flow-div{background:var(--border2);align-self:stretch;}
+.flow-col{display:flex;flex-direction:column;gap:2px;min-height:0;}
+.flow-ttl{font-size:8.5px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--w30);margin-bottom:3px;padding-bottom:4px;border-bottom:1px solid var(--border);flex-shrink:0;}
+.flow-ttl.am{color:var(--amber);}
+.fn{padding:5px 7px;border-radius:6px;font-size:10px;font-weight:500;border:1px solid var(--border2);background:var(--w12);color:var(--w70);text-align:center;line-height:1.3;flex-shrink:0;}
+.fn sub{display:block;font-size:8.5px;font-weight:400;color:var(--w30);margin-top:1px;}
+.fn.bl{background:var(--blue-d);border-color:rgba(74,158,255,.2);color:var(--blue);}
+.fn.tl{background:var(--teal-d);border-color:rgba(46,207,189,.2);color:var(--teal);}
+.fn.am{background:var(--amber-d);border-color:rgba(245,158,11,.2);color:var(--amber);}
+.fa{width:2px;height:8px;background:var(--border2);margin:1px auto;position:relative;flex-shrink:0;}
+.fa::after{content:'';position:absolute;bottom:-2px;left:-3px;border-left:4px solid transparent;border-right:4px solid transparent;border-top:5px solid var(--border2);}
+.fa.t{background:var(--teal);}.fa.t::after{border-top-color:var(--teal);}
+.fa.a{background:var(--amber);}.fa.a::after{border-top-color:var(--amber);}
+
+/* ══ D FUTURE ══ */
+.fut-top{display:grid;grid-template-columns:1fr 1fr;gap:6px;flex-shrink:0;}
+.f-box{padding:9px 11px;border-radius:8px;background:var(--w12);border:1px solid var(--border2);}
+.f-box.am{background:var(--amber-d);border-color:rgba(245,158,11,.2);}
+.f-eye{font-size:8px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--w30);margin-bottom:2px;}
+.f-eye.am{color:var(--amber);}
+.f-val{font-size:16px;font-weight:300;letter-spacing:-.02em;color:var(--w100);}
+.f-val span{font-size:9px;color:var(--w50);}
+.f-sub{font-size:8.5px;color:var(--w30);margin-top:1px;font-variant-numeric:tabular-nums;}
+.stack-bar{height:9px;border-radius:99px;overflow:hidden;display:flex;margin:6px 0 4px;flex-shrink:0;}
+.stack-seg{height:100%;transition:width .4s ease;}
+.stack-leg{display:flex;gap:10px;flex-shrink:0;}
+.sleg{display:flex;align-items:center;gap:4px;font-size:10.5px;color:var(--w50);}
+.sleg-dot{width:6px;height:6px;border-radius:2px;flex-shrink:0;}
+.fut-detail{
+  display:grid;grid-template-columns:repeat(3,1fr);gap:4px;
+  padding:6px;background:rgba(245,158,11,.05);border-radius:7px;
+  border:1px solid rgba(245,158,11,.1);flex-shrink:0;
+}
+.fd-c{text-align:center;}
+.fd-l{font-size:9px;color:var(--w30);margin-bottom:2px;}
+.fd-v{font-size:13px;font-weight:600;font-variant-numeric:tabular-nums;}
+
+/* ══ E ROADMAP — horizontal ══ */
+.htl-wrap{
+  position:relative;display:grid;grid-template-columns:repeat(5,1fr);
+  flex:1;min-height:0;align-items:start;padding-top:18px;
+}
+.htl-line{
+  position:absolute;top:8px;left:10%;right:10%;height:2px;
+  background:linear-gradient(90deg,var(--blue),var(--purple) 25%,var(--amber) 50%,var(--teal) 75%,var(--purple));
+  border-radius:2px;z-index:0;
+}
+.htl-item{display:flex;flex-direction:column;align-items:center;text-align:center;padding:0 4px;position:relative;z-index:1;}
+.htl-dot{width:14px;height:14px;border-radius:50%;border:2px solid var(--bg);flex-shrink:0;margin-bottom:6px;}
+.htl-time{font-size:8.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--w30);margin-bottom:3px;}
+.htl-title{font-size:10.5px;font-weight:600;color:var(--w100);line-height:1.3;margin-bottom:2px;}
+.htl-desc{font-size:9px;color:var(--w50);line-height:1.4;margin-bottom:3px;}
+
+/* ══ F PRINCIPLES — horizontal ══ */
+.prin-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;flex:1;min-height:0;align-items:center;}
+.prin-item{display:flex;align-items:flex-start;gap:6px;}
+.prin-item+.prin-item{border-left:1px solid var(--border);padding-left:6px;}
+.prin-check{width:15px;height:15px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px;}
+.prin-check svg{width:7px;height:7px;}
+.prin-txt{font-size:10px;color:var(--w70);line-height:1.45;}
+.prin-txt b{color:var(--w100);font-weight:600;}
+
+/* flash */
+.flash{animation:fl .2s ease;}
+@keyframes fl{0%,100%{opacity:1;}50%{opacity:.3;}}
+</style>
+</head>
+<body class="hide">
+<div class="db">
+
+<!-- ══ HEADER ══ -->
+<div class="hdr g-hdr">
+  <div class="hdr-l">
+    <div class="hdr-eye">Financial Portfolio</div>
+    <div class="hdr-ttl">금융자산 포트폴리오 <span>& 미래 자산 흐름</span>
+      <span id="amt-toggle" title="금액 숨김/표시 전환">
+        <span id="toggle-icon">🙈</span>
+        <div id="toggle-switch"></div>
+        <span id="toggle-label">금액 숨김</span>
+      </span>
+    </div>
+  </div>
+  <div class="hdr-r">
+    <div class="pill">총 금융자산 <b class="blur-amt" id="h-total">—</b></div>
+    <div class="pill">순자산 <b class="blur-amt" id="h-net">—</b></div>
+    <div class="pill teal">운용자산 <b class="blur-amt" id="h-ops">—</b></div>
+    <div class="pill amber">1 AUD ≈ <b id="h-aud">—</b></div>
+  </div>
+</div>
+
+<!-- ══ INPUT PANEL ══ -->
+<div class="card g-inp gp">
+
+  <!-- 탭 버튼 — 항상 보임 -->
+  <div class="sidebar-tab" id="sidebar-tab">
+    <span class="sidebar-tab-icon">‹</span>
+    <span class="sidebar-tab-label">금액 편집</span>
+  </div>
+
+  <!-- 내부 콘텐츠 — 열렸을 때만 -->
+  <div class="sidebar-inner">
+    <div class="eye" style="flex-shrink:0;">⚙ 금액 입력 — 실시간 반영</div>
+    <div class="inp-scroll">
+
+      <div style="display:flex;flex-direction:column;gap:6px;">
+        <div class="inp-sec-lbl">현재 자산</div>
+        <div class="inp-row"><div class="inp-lbl">계좌·현금 합계 <small>전세·예적금·파킹·입출금 포함</small></div><input class="inp-field c-purple" id="i-cash" type="number" value="127477180"></div>
+        <div class="inp-row"><div class="inp-lbl">장기 ETF·주식 평가액</div><input class="inp-field c-teal" id="i-invest-long" type="number" value="11251186"></div>
+        <div class="inp-row"><div class="inp-lbl">ISA 단기채권 ETF <small>KODEX 단기채권PLUS</small></div><input class="inp-field" style="border-color:rgba(129,140,248,.3);accent-color:#818CF8;" id="i-invest-short" type="number" value="4580400"></div>
+        <div class="inp-row"><div class="inp-lbl">파킹통장 <small>OK짠테크II · 계좌현금 내</small></div><input class="inp-field c-amber" id="i-parking" type="number" value="5000000"></div>
+        <div class="inp-row"><div class="inp-lbl">전세보증금 총액</div><input class="inp-field" id="i-jeonse" type="number" value="96320000"></div>
+        <div class="inp-row"><div class="inp-lbl">부모 차용금 <small>마이너스</small></div><input class="inp-field" id="i-loan" type="number" value="3827381"></div>
+        <div class="inp-row"><div class="inp-lbl">청년도약계좌</div><input class="inp-field c-purple" id="i-doakye" type="number" value="19600000"></div>
+        <div class="inp-row"><div class="inp-lbl">청년주택드림 청약</div><input class="inp-field" id="i-chungak" type="number" value="5910000"></div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:6px;">
+        <div class="inp-sec-lbl">청도계 해지 수령</div>
+        <div class="inp-row"><div class="inp-lbl">예상 이자</div><input class="inp-field c-teal" id="i-interest" type="number" value="992250"></div>
+        <div class="inp-row"><div class="inp-lbl">정부 기여금</div><input class="inp-field c-teal" id="i-gov" type="number" value="689000"></div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:6px;">
+        <div class="inp-sec-lbl">퇴직금 배분 계획</div>
+        <div class="inp-row"><div class="inp-lbl">퇴직금 예정액</div><input class="inp-field c-amber" id="i-retire" type="number" value="14600000"></div>
+        <div class="inp-row"><div class="inp-lbl">출국+초기정착비 보충</div><input class="inp-field c-amber" id="i-retire-whol" type="number" value="4900000"></div>
+        <div class="inp-row"><div class="inp-lbl">귀국 항공권 예비금</div><input class="inp-field c-amber" id="i-retire-flight" type="number" value="800000"></div>
+        <div class="inp-row"><div class="inp-lbl">청미적 15개월 확보</div><input class="inp-field c-amber" id="i-retire-chungmi" type="number" value="7500000"></div>
+        <div class="inp-row"><div class="inp-lbl">잔여 버퍼 <small>자동계산</small></div>
+          <div class="inp-calc blur-amt" id="calc-retire-buf">—</div>
+        </div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:6px;">
+        <div class="inp-sec-lbl">워홀 자금 계획</div>
+        <div class="inp-row"><div class="inp-lbl">워홀 자금 목표</div><input class="inp-field" id="i-whol-target" type="number" value="10000000"></div>
+        <div class="inp-row"><div class="inp-lbl">8~10월 월 저축액</div><input class="inp-field" id="i-whol-monthly" type="number" value="1700000"></div>
+        <div class="inp-row"><div class="inp-lbl">저축 개월 수</div><input class="inp-field" id="i-whol-months" type="number" value="3"></div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:6px;">
+        <div class="inp-sec-lbl">환율</div>
+        <div class="inp-row"><div class="inp-lbl">1 AUD = ? KRW</div><input class="inp-field" id="i-rate" type="number" value="1068"></div>
+      </div>
+
+    </div>
+    <button class="reset-btn" id="reset-btn">↺ 기본값으로 초기화</button>
+  </div>
+
+</div>
+
+<!-- ══ A: ASSET ALLOCATION (tall) ══ -->
+<div class="card g-A gb">
+  <div class="eye">A — Asset Allocation · 항목 클릭 → 하단 상세</div>
+
+  <!-- 차트 + 레전드 상단 고정 -->
+  <div class="a-top">
+    <div class="donut-box">
+      <svg viewBox="0 0 110 110" style="transform:rotate(-90deg)">
+        <circle cx="55" cy="55" r="46" fill="none" stroke="#1E1E1E" stroke-width="15"/>
+        <circle id="da-doakye"       cx="55" cy="55" r="46" fill="none" stroke="#A78BFA" stroke-width="15" stroke-linecap="butt"/>
+        <circle id="da-invest-long"  cx="55" cy="55" r="46" fill="none" stroke="#2ECFBD" stroke-width="15" stroke-linecap="butt"/>
+        <circle id="da-invest-short" cx="55" cy="55" r="46" fill="none" stroke="#818CF8" stroke-width="15" stroke-linecap="butt"/>
+        <circle id="da-parking"      cx="55" cy="55" r="46" fill="none" stroke="#F59E0B" stroke-width="15" stroke-linecap="butt"/>
+        <circle id="da-cash2"        cx="55" cy="55" r="46" fill="none" stroke="#4ADE80" stroke-width="15" stroke-linecap="butt"/>
+        <circle id="da-chungak"      cx="55" cy="55" r="46" fill="none" stroke="#4A9EFF" stroke-width="15" stroke-linecap="butt"/>
+      </svg>
+      <div class="donut-mid">
+        <span class="dm-lbl">운용자산</span>
+        <span class="dm-val blur-amt" id="dm-val">—</span>
+        <span class="dm-sub">전세 제외</span>
+      </div>
+    </div>
+    <div class="leg">
+      <div class="leg-row" data-key="doakye" id="lr-doakye">
+        <div class="leg-dot" style="background:#A78BFA"></div>
+        <span class="leg-name">청년도약계좌 ↗</span>
+        <span class="leg-pct" id="lp-doakye" style="color:#A78BFA">—</span>
+        <span class="leg-amt blur-amt" id="la-doakye">—</span>
+      </div>
+      <div class="leg-row" data-key="invest-long" id="lr-invest-long">
+        <div class="leg-dot" style="background:#2ECFBD"></div>
+        <span class="leg-name">장기 ETF·주식 ↗</span>
+        <span class="leg-pct" id="lp-invest-long" style="color:#2ECFBD">—</span>
+        <span class="leg-amt blur-amt" id="la-invest-long">—</span>
+      </div>
+      <div class="leg-row" data-key="invest-short" id="lr-invest-short">
+        <div class="leg-dot" style="background:#818CF8"></div>
+        <span class="leg-name">ISA 단기채권 ETF ↗</span>
+        <span class="leg-pct" id="lp-invest-short" style="color:#818CF8">—</span>
+        <span class="leg-amt blur-amt" id="la-invest-short">—</span>
+      </div>
+      <div class="leg-row" data-key="parking" id="lr-parking">
+        <div class="leg-dot" style="background:#F59E0B"></div>
+        <span class="leg-name">파킹통장·단기현금 ↗</span>
+        <span class="leg-pct" id="lp-parking" style="color:#F59E0B">—</span>
+        <span class="leg-amt blur-amt" id="la-parking">—</span>
+      </div>
+      <div class="leg-row" data-key="cash2" id="lr-cash2">
+        <div class="leg-dot" style="background:#4ADE80"></div>
+        <span class="leg-name">기타현금·유동 ↗</span>
+        <span class="leg-pct" id="lp-cash2" style="color:#4ADE80">—</span>
+        <span class="leg-amt blur-amt" id="la-cash2">—</span>
+      </div>
+      <div class="leg-row" data-key="chungak" id="lr-chungak">
+        <div class="leg-dot" style="background:#4A9EFF"></div>
+        <span class="leg-name">청년주택드림 청약 ↗</span>
+        <span class="leg-pct" id="lp-chungak" style="color:#4A9EFF">—</span>
+        <span class="leg-amt blur-amt" id="la-chungak">—</span>
+      </div>
+      <div class="a-total">
+        <span class="a-total-lbl">운용 금융자산</span>
+        <div style="text-align:right;">
+          <div class="a-total-val blur-amt" id="t-ops">—</div>
+          <div class="a-total-aud blur-amt" id="t-ops-aud">—</div>
+        </div>
+      </div>
+      <div style="display:flex;gap:4px;flex-wrap:wrap;flex-shrink:0;">
+        <span class="tag tag-t" id="tag-invest">투자 —%</span>
+        <span class="tag tag-p" id="tag-doakye">정책저축 —%</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 상세 패널 — 클릭 시 내용 변경 -->
+  <div class="a-detail">
+    <div class="a-detail-title" id="det-title">← 항목을 클릭하면 상세 정보가 여기 표시됩니다</div>
+    <div class="a-detail-body" id="det-body">
+      <div class="det-note" style="background:rgba(255,255,255,.03);border:1px solid var(--border2);color:var(--w30);">
+        위 레전드에서 항목을 클릭하세요.
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ B: REBALANCE ══ -->
+<div class="card g-B gt">
+  <div class="eye">B — 리밸런싱 Before → After</div>
+  <div class="ba-wrap">
+    <div class="ba-col">
+      <div class="ba-lbl">Before</div>
+      <div class="ba-row"><div class="ba-top"><span class="ba-n">청도계</span><span class="ba-p" id="b-doakye" style="color:#A78BFA">—</span></div><div class="ba-track"><div class="ba-fill" id="bf-doakye" style="background:#A78BFA"></div></div></div>
+      <div class="ba-row"><div class="ba-top"><span class="ba-n">투자</span><span class="ba-p" id="b-invest" style="color:#2ECFBD">—</span></div><div class="ba-track"><div class="ba-fill" id="bf-invest" style="background:#2ECFBD"></div></div></div>
+      <div class="ba-row"><div class="ba-top"><span class="ba-n">기타현금</span><span class="ba-p" id="b-cash2" style="color:#4ADE80">—</span></div><div class="ba-track"><div class="ba-fill" id="bf-cash2" style="background:#4ADE80"></div></div></div>
+      <div class="ba-row"><div class="ba-top"><span class="ba-n">청약</span><span class="ba-p" id="b-chungak" style="color:#4A9EFF">—</span></div><div class="ba-track"><div class="ba-fill" id="bf-chungak" style="background:#4A9EFF"></div></div></div>
+      <div style="font-size:9.5px;color:var(--w30);margin-top:2px;">투자 <b id="b-inv-sum" style="color:var(--w70)">—</b></div>
+    </div>
+    <div class="ba-arr"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="13 6 19 12 13 18"/></svg></div>
+    <div class="ba-col">
+      <div class="ba-lbl after">After</div>
+      <div class="ba-row"><div class="ba-top"><span class="ba-n">청도계</span><span class="ba-p" style="color:var(--w30)">0%</span></div><div class="ba-track"><div class="ba-fill" style="width:0%"></div></div></div>
+      <div class="ba-row"><div class="ba-top"><span class="ba-n">투자</span><span class="ba-p" id="a-invest" style="color:#2ECFBD">—</span></div><div class="ba-track"><div class="ba-fill" id="af-invest" style="background:#2ECFBD"></div></div></div>
+      <div class="ba-row"><div class="ba-top"><span class="ba-n">기타현금</span><span class="ba-p" id="a-cash2" style="color:#4ADE80">—</span></div><div class="ba-track"><div class="ba-fill" id="af-cash2" style="background:#4ADE80"></div></div></div>
+      <div class="ba-row"><div class="ba-top"><span class="ba-n">청약</span><span class="ba-p" id="a-chungak" style="color:#4A9EFF">—</span></div><div class="ba-track"><div class="ba-fill" id="af-chungak" style="background:#4A9EFF"></div></div></div>
+      <div style="font-size:9.5px;color:var(--w30);margin-top:2px;">투자 <b id="a-inv-sum" style="color:#2ECFBD">—</b> ↑</div>
+    </div>
+  </div>
+  <div class="rebal-box">
+    <div class="rebal-eye">특별중도해지 예상 수령</div>
+    <div class="r3">
+      <div><div class="r3-l">납입 원금</div><div class="r3-v blur-amt" id="r-principal">—</div><div class="r3-s blur-amt" id="r-principal-aud">—</div></div>
+      <div style="border-left:1px solid var(--border2);border-right:1px solid var(--border2);">
+        <div class="r3-l">이자+기여금</div><div class="r3-v blur-amt" id="r-bonus" style="color:#4ADE80">—</div><div class="r3-s blur-amt" id="r-bonus-aud">—</div>
+      </div>
+      <div><div class="r3-l" style="color:var(--teal);">총 수령</div><div class="r3-v blur-amt" id="r-total" style="color:var(--teal)">—</div><div class="r3-s blur-amt" id="r-total-aud">—</div></div>
+    </div>
+  </div>
+  <div class="rebal-key"><b>✔ 리밸런싱</b> — 새 돈이 아닌 자산 성격 전환. 총 금융자산 불변.</div>
+</div>
+
+<!-- ══ C: FLOW ══ -->
+<div class="card g-C">
+  <div class="eye">C — 자산 이동 플로우</div>
+  <div class="flow-cols">
+    <div class="flow-col">
+      <div class="flow-ttl">현재 금융자산 흐름</div>
+      <div class="fn">현재 금융자산<sub class="blur-amt" id="f-ops">—</sub></div>
+      <div class="fa t"></div>
+      <div class="fn bl">청년도약계좌<sub class="blur-amt" id="f-doakye">—</sub></div>
+      <div class="fa t"></div>
+      <div class="fn" style="font-size:9px;color:var(--w50);">특별중도해지</div>
+      <div class="fa t"></div>
+      <div class="fn tl"><span class="blur-amt" id="f-receipt">—</span><sub>원금+이자+기여금</sub></div>
+      <div class="fa t"></div>
+      <div class="fn" style="font-size:9px;">ISA 중개형 서민형</div>
+      <div class="fa t"></div>
+      <div class="fn tl">ETF 장기투자<sub>인덱스 · 5년+ 목표</sub></div>
+    </div>
+    <div class="flow-div"></div>
+    <div class="flow-col">
+      <div class="flow-ttl am">미래 유입 예정</div>
+      <div class="fn am"><span class="blur-amt" id="f-retire">—</span><sub>2026년 10월 예정</sub></div>
+      <div class="fa a"></div>
+      <div class="fn" style="font-size:9px;color:var(--w50);">현재 포트폴리오 미포함</div>
+      <div class="fa a"></div>
+      <div class="fn" id="f-chungmi" style="font-size:9.5px;">① 청미적 <b style="color:var(--amber)">—%</b><sub class="blur-amt" id="f-chungmi-sub">—</sub></div>
+      <div class="fn tl" id="f-etf" style="font-size:9.5px;">② ETF <b>—%</b><sub class="blur-amt" id="f-etf-sub">—</sub></div>
+      <div class="fa a"></div>
+      <div class="fn" style="font-size:9.5px;" id="f-months-node">— 개월 동시 운용</div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ D: FUTURE ══ -->
+<div class="card g-D ga">
+  <div class="eye">D — 미래 유입 자산 & 워홀 자금 계획</div>
+
+  <!-- 퇴직금 + 워홀 목표 2열 -->
+  <div class="fut-top">
+    <div class="f-box am">
+      <div class="f-eye am">퇴직금 예상 (10월 유입)</div>
+      <div class="f-val blur-amt" id="d-retire">—</div>
+      <div class="f-sub blur-amt" id="d-retire-aud">—</div>
+      <div class="f-sub">현재 포트폴리오 미포함</div>
+    </div>
+    <div class="f-box" style="background:rgba(46,207,189,.05);border-color:rgba(46,207,189,.2);">
+      <div class="f-eye" style="color:var(--teal);">워홀 자금 목표</div>
+      <div class="f-val blur-amt" id="d-whol-target">—</div>
+      <div class="f-sub blur-amt" id="d-whol-gap">퇴직금 보충 — · 8~10월 저축 —</div>
+    </div>
+  </div>
+
+  <!-- 퇴직금 4분할 스택바 -->
+  <div class="stack-bar">
+    <div class="stack-seg" id="s-whol"   style="background:#F59E0B"></div>
+    <div class="stack-seg" id="s-flight" style="background:#F87171"></div>
+    <div class="stack-seg" id="s-chungmi" style="background:#2ECFBD"></div>
+    <div class="stack-seg" id="s-buf"    style="background:#6B7280"></div>
+  </div>
+  <div style="display:flex;gap:8px;flex-shrink:0;flex-wrap:wrap;">
+    <div class="sleg"><div class="sleg-dot" style="background:#F59E0B"></div><span class="blur-amt" id="sl-whol">—</span></div>
+    <div class="sleg"><div class="sleg-dot" style="background:#F87171"></div><span class="blur-amt" id="sl-flight">—</span></div>
+    <div class="sleg"><div class="sleg-dot" style="background:#2ECFBD"></div><span class="blur-amt" id="sl-chungmi">—</span></div>
+    <div class="sleg"><div class="sleg-dot" style="background:#6B7280"></div><span class="blur-amt" id="sl-buf">—</span></div>
+  </div>
+
+  <!-- 4분할 상세 -->
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:4px;padding:6px;background:rgba(245,158,11,.04);border-radius:7px;border:1px solid rgba(245,158,11,.1);flex-shrink:0;">
+    <div class="fd-c">
+      <div class="fd-l" style="color:#F59E0B;">출국+정착비</div>
+      <div class="fd-v blur-amt" id="fd-whol" style="color:#F59E0B">—</div>
+      <div class="fd-l" id="fd-whol-pct">—</div>
+    </div>
+    <div class="fd-c" style="border-left:1px solid rgba(245,158,11,.12);">
+      <div class="fd-l" style="color:#F87171;">귀국 항공권</div>
+      <div class="fd-v blur-amt" id="fd-flight" style="color:#F87171">—</div>
+      <div class="fd-l" id="fd-flight-pct">—</div>
+    </div>
+    <div class="fd-c" style="border-left:1px solid rgba(245,158,11,.12);">
+      <div class="fd-l" style="color:var(--teal);">청미적 15개월</div>
+      <div class="fd-v blur-amt" id="fd-chungmi" style="color:var(--teal)">—</div>
+      <div class="fd-l" id="fd-chungmi-pct">—</div>
+    </div>
+    <div class="fd-c" style="border-left:1px solid rgba(245,158,11,.12);">
+      <div class="fd-l">잔여 버퍼</div>
+      <div class="fd-v blur-amt" id="fd-buf">—</div>
+      <div class="fd-l" id="fd-buf-pct">—</div>
+    </div>
+  </div>
+
+  <!-- 워홀 저축 진행 -->
+  <div style="padding:5px 8px;border-radius:7px;background:rgba(46,207,189,.06);border:1px solid rgba(46,207,189,.15);flex-shrink:0;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+      <span style="font-size:8.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--teal);">8~10월 추가 저축</span>
+      <span class="blur-amt" style="font-size:10.5px;font-weight:600;color:var(--w100);" id="d-whol-savings">—</span>
+    </div>
+    <div style="height:4px;background:var(--w12);border-radius:99px;overflow:hidden;">
+      <div id="bar-whol-savings" style="height:100%;border-radius:99px;background:var(--teal);transition:width .4s;"></div>
+    </div>
+    <div style="font-size:8.5px;color:var(--w30);margin-top:3px;" id="d-whol-desc">—</div>
+  </div>
+</div>
+
+
+<!-- ══ E: ROADMAP ══ -->
+<div class="card g-E gp">
+  <div class="eye">E — Investment Roadmap</div>
+  <div class="htl-wrap">
+    <div class="htl-line"></div>
+    <div class="htl-item">
+      <div class="htl-dot" style="background:var(--blue);box-shadow:0 0 0 3px rgba(74,158,255,.2)"></div>
+      <div class="htl-time">현재 · 2026</div>
+      <div class="htl-title">현재 금융자산 운용</div>
+      <div class="htl-desc blur-amt" id="tl-1">—</div>
+      <span class="tag tag-b">안정성 중심</span>
+    </div>
+    <div class="htl-item">
+      <div class="htl-dot" style="background:var(--purple);box-shadow:0 0 0 3px rgba(167,139,250,.2)"></div>
+      <div class="htl-time">2026 단기</div>
+      <div class="htl-title">청도계 해지 → ISA ETF</div>
+      <div class="htl-desc blur-amt" id="tl-2">—</div>
+      <span class="tag tag-p">리밸런싱</span>
+    </div>
+    <div class="htl-item">
+      <div class="htl-dot" style="background:var(--amber);box-shadow:0 0 0 3px rgba(245,158,11,.2)"></div>
+      <div class="htl-time">2026년 10월</div>
+      <div class="htl-title blur-amt" id="tl-3-title">퇴직금 유입</div>
+      <div class="htl-desc blur-amt" id="tl-3">—</div>
+      <span class="tag tag-a">미래 유입</span>
+    </div>
+    <div class="htl-item">
+      <div class="htl-dot" style="background:var(--teal);box-shadow:0 0 0 3px rgba(46,207,189,.2)"></div>
+      <div class="htl-time">워홀 기간</div>
+      <div class="htl-title">한국 장기자산 유지</div>
+      <div class="htl-desc">청미적 자동납입 · ETF 보유</div>
+      <span class="tag tag-t">자산 유지</span>
+    </div>
+    <div class="htl-item">
+      <div class="htl-dot" style="background:var(--purple);box-shadow:0 0 0 3px rgba(167,139,250,.2)"></div>
+      <div class="htl-time">5년+</div>
+      <div class="htl-title">ETF 장기복리 + 청미적 만기</div>
+      <div class="htl-desc">인덱스 ETF 최소 5년 · 복리 극대화</div>
+      <span class="tag tag-p">장기 복리</span>
+    </div>
+  </div>
+</div>
+
+</div><!-- end .db -->
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+
+const $ = id => document.getElementById(id);
+const W = id => { const el=$(id); return el ? Number(el.value)||0 : 0; };
+const fx = n  => Math.round(n).toLocaleString('ko-KR')+'원';
+const fxM= n  => { const m=Math.round(n/10000); return m>=10000?(m/10000).toFixed(1)+'억원':m+'만원'; };
+const au = (n,r)=> r>0?`≈ A$${Math.round(n/r).toLocaleString()}`:'';
+const pc = (n,t)=> t>0?(n/t*100).toFixed(1)+'%':'0%';
+const pN = (n,t)=> t>0?n/t*100:0;
+
+const DEFAULTS = {
+  cash:127477180, 'invest-long':11251186, 'invest-short':4580400,
+  parking:5000000, jeonse:96320000, loan:3827381,
+  doakye:19600000, chungak:5910000,
+  interest:992250, gov:689000,
+  retire:14600000, 'retire-whol':4900000,
+  'retire-flight':800000, 'retire-chungmi':7500000,
+  'whol-target':10000000, 'whol-monthly':1700000, 'whol-months':3,
+  rate:1068
+};
+
+const CIRC = 2*Math.PI*46;
+function setArc(id,frac,rot){
+  const el=$(id); if(!el)return;
+  el.setAttribute('stroke-dasharray',CIRC);
+  el.setAttribute('stroke-dashoffset',CIRC*(1-frac));
+  el.setAttribute('transform',`rotate(${rot} 55 55)`);
+}
+
+function update(){
+  const cash=W('i-cash'), investL=W('i-invest-long'), investS=W('i-invest-short'),
+        parking=W('i-parking'), jeonse=W('i-jeonse'), loan=W('i-loan'),
+        doakye=W('i-doakye'), chungak=W('i-chungak'),
+        interest=W('i-interest'), gov=W('i-gov'),
+        retire=W('i-retire'), retireWhol=W('i-retire-whol'),
+        retireFlight=W('i-retire-flight'), retireChungmi=W('i-retire-chungmi'),
+        wholTarget=W('i-whol-target'), wholMonthly=W('i-whol-monthly'),
+        wholMonths=W('i-whol-months'), rate=W('i-rate');
+
+  const totalFin  = cash + investL + investS;
+  const netWorth  = totalFin - loan;
+  const cashOther = cash - jeonse - doakye - chungak;   // includes parking
+  const cashPure  = cashOther - parking;                 // residual 기타현금
+
+  const opsTotal  = doakye + investL + investS + parking + cashPure + chungak;
+  const receipt   = doakye + interest + gov;
+  const bonus     = interest + gov;
+
+  // 리밸런싱 after: 청도계 → ISA ETF
+  const afterInvestL = investL + receipt;
+  const afterTotal   = afterInvestL + investS + parking + cashPure + chungak;
+
+  // 퇴직금 배분
+  const retireBuf    = retire - retireWhol - retireFlight - retireChungmi;
+
+  // 워홀 자금
+  const wholSavings  = wholMonthly * wholMonths;
+  const wholGap      = wholTarget - wholSavings;        // 퇴직금에서 보충
+  const wholPct      = wholTarget > 0 ? wholSavings/wholTarget*100 : 0;
+
+  const set = (id,v) => { const el=$(id); if(el) el.textContent=v; };
+  const setH= (id,v) => { const el=$(id); if(el) el.innerHTML=v; };
+
+  // Header
+  set('h-total', fx(totalFin));
+  set('h-net',   fx(netWorth));
+  set('h-ops',   fx(opsTotal));
+  set('h-aud',   rate+'원');
+
+  // Donut — 6 segments
+  set('dm-val', fxM(opsTotal));
+  const segs = [
+    {id:'da-doakye',       n:doakye},
+    {id:'da-invest-long',  n:investL},
+    {id:'da-invest-short', n:investS},
+    {id:'da-parking',      n:parking},
+    {id:'da-cash2',        n:cashPure},
+    {id:'da-chungak',      n:chungak},
+  ];
+  let rot=0;
+  segs.forEach(({id,n})=>{
+    const f=pN(n,opsTotal)/100;
+    setArc(id,f,rot);
+    rot+=f*360;
+  });
+
+  // Legend
+  const legPairs = [
+    ['doakye',       doakye,   opsTotal],
+    ['invest-long',  investL,  opsTotal],
+    ['invest-short', investS,  opsTotal],
+    ['parking',      parking,  opsTotal],
+    ['cash2',        cashPure, opsTotal],
+    ['chungak',      chungak,  opsTotal],
+  ];
+  legPairs.forEach(([k,n,t])=>{
+    set('lp-'+k, pc(n,t));
+    set('la-'+k, fxM(n));
+  });
+  set('t-ops',     fx(opsTotal));
+  set('t-ops-aud', au(opsTotal,rate));
+  set('tag-invest-long',  '장기투자 '+pc(investL,opsTotal));
+  set('tag-invest-short', '단기채권 '+pc(investS,opsTotal));
+  set('tag-parking',      '파킹 '+pc(parking,opsTotal));
+  set('tag-doakye',       '정책저축 '+pc(doakye,opsTotal));
+
+  // B rebalance (청도계 → 장기ETF)
+  const bD=pN(doakye,opsTotal), bIL=pN(investL,opsTotal),
+        bIS=pN(investS,opsTotal), bP=pN(parking,opsTotal),
+        bC=pN(cashPure,opsTotal), bK=pN(chungak,opsTotal);
+  const aIL=pN(afterInvestL,afterTotal), aIS=pN(investS,afterTotal),
+        aP=pN(parking,afterTotal), aC=pN(cashPure,afterTotal), aK=pN(chungak,afterTotal);
+
+  const setBar=(t,b,v)=>{ set(t,v.toFixed(1)+'%'); const el=$(b); if(el) el.style.width=Math.min(v,100)+'%'; };
+  setBar('b-doakye','bf-doakye',bD);
+  setBar('b-invest','bf-invest',bIL+bIS);  // 장기+단기 합산
+  setBar('b-cash2','bf-cash2',bC+bP);      // 현금성 합산
+  setBar('b-chungak','bf-chungak',bK);
+  set('b-inv-sum', (bIL+bIS).toFixed(1)+'%');
+  setBar('a-invest','af-invest',aIL+aIS);
+  setBar('a-cash2','af-cash2',aC+aP);
+  setBar('a-chungak','af-chungak',aK);
+  set('a-inv-sum', (aIL+aIS).toFixed(1)+'%');
+  set('r-principal',     fx(doakye));   set('r-principal-aud', au(doakye,rate));
+  set('r-bonus',   '+'+fx(bonus));      set('r-bonus-aud',     au(bonus,rate));
+  set('r-total',         fx(receipt));  set('r-total-aud',     au(receipt,rate));
+
+  // C flow
+  set('f-ops',    fx(opsTotal)+' (전세 제외)');
+  set('f-doakye', fx(doakye)+' · '+pc(doakye,opsTotal));
+  set('f-receipt', fx(receipt)+' 수령');
+  set('f-retire',  fx(retire));
+  setH('f-chungmi', `① 출국+정착비 <b style="color:var(--amber)">${pc(retireWhol,retire)}</b>`);
+  set('f-chungmi-sub', fx(retireWhol));
+  setH('f-etf', `② 청미적+항공 <b>${pc(retireChungmi+retireFlight,retire)}</b>`);
+  set('f-etf-sub', fx(retireChungmi+retireFlight)+' ('+fx(retireChungmi)+'+'+fx(retireFlight)+')');
+  set('f-months-node', '버퍼 '+fx(retireBuf));
+
+  // D future
+  setH('d-retire', fxM(retire)+'<span>원</span>');
+  set('d-retire-aud', au(retire,rate));
+  setH('d-whol-target', fxM(wholTarget)+'<span>원 목표</span>');
+  set('d-whol-gap', `퇴직금 보충 ${fx(retireWhol)} · 8~10월 저축 ${fx(wholSavings)}`);
+
+  // 4분할 스택바
+  const setPct=(segId,pct)=>{ const el=$(segId); if(el) el.style.width=pct+'%'; };
+  setPct('s-whol',    pN(retireWhol,retire));
+  setPct('s-flight',  pN(retireFlight,retire));
+  setPct('s-chungmi', pN(retireChungmi,retire));
+  setPct('s-buf',     pN(retireBuf,retire));
+
+  set('sl-whol',    `출국+정착비 ${pc(retireWhol,retire)} · ${fx(retireWhol)}`);
+  set('sl-flight',  `귀국항공권 ${pc(retireFlight,retire)} · ${fx(retireFlight)}`);
+  set('sl-chungmi', `청미적 ${pc(retireChungmi,retire)} · ${fx(retireChungmi)}`);
+  set('sl-buf',     `버퍼 ${pc(retireBuf,retire)} · ${fx(retireBuf)}`);
+
+  set('fd-whol',   fx(retireWhol));   set('fd-whol-pct',   pc(retireWhol,retire));
+  set('fd-flight', fx(retireFlight)); set('fd-flight-pct', pc(retireFlight,retire));
+  set('fd-chungmi',fx(retireChungmi));set('fd-chungmi-pct',pc(retireChungmi,retire));
+  set('fd-buf',    fx(retireBuf));    set('fd-buf-pct',    pc(retireBuf,retire));
+
+  // 워홀 저축 진행바
+  setH('d-whol-savings', fx(wholSavings));
+  const barEl=$('bar-whol-savings'); if(barEl) barEl.style.width=Math.min(wholPct,100)+'%';
+  set('d-whol-desc', `월 ${fx(wholMonthly)} × ${wholMonths}개월 = ${fx(wholSavings)} (목표 ${pc(wholSavings,wholTarget)})`);
+
+  // 입력패널 버퍼 자동계산
+  const bufEl=$('calc-retire-buf'); if(bufEl) bufEl.textContent=fx(retireBuf>0?retireBuf:0);
+
+  // E roadmap
+  set('tl-1', `총 ${fx(opsTotal)} · 청도계 ${pc(doakye,opsTotal)} · 투자 ${pc(investL+investS,opsTotal)}`);
+  set('tl-2', `${fx(receipt)} 수령 → 장기투자 ${pc(investL,opsTotal)} → ${aIL.toFixed(1)}%`);
+  set('tl-3-title', `퇴직금 ${fx(retire)} 유입`);
+  set('tl-3', `출국비 ${pc(retireWhol,retire)} · 청미적 ${pc(retireChungmi,retire)} · 버퍼 ${pc(retireBuf,retire)}`);
+
+  // F principles
+  setH('p-1', `청도계 ${fx(receipt)}은 <b>리밸런싱</b>. 총액 불변`);
+  setH('p-2', `퇴직금 ${fx(retire)}은 <b>미래 유입 예정</b>. 4항목 배분`);
+  set('p-3',  `자산 재분류: 파킹·ISA단기채권 신설`);
+  setH('p-5', `순자산 <b>${fx(netWorth)}</b> (전세 포함·차용금 차감)`);
+
+  if(currentKey) showDetail(currentKey);
+}
+
+// ══ A DETAIL PANEL ══
+let currentKey = null;
+
+const detRow = (icon,bg,name,desc,amt,pct,aud,barColor,barPct) => `
+  <div class="det-row">
+    <div class="det-icon" style="background:${bg}">${icon}</div>
+    <div class="det-info">
+      <div class="det-name">${name}</div>
+      ${desc?`<div class="det-desc">${desc}</div>`:''}
+      ${barColor?`<div class="det-bar-wrap"><div class="det-bar"><div class="det-bar-fill" style="width:${Math.min(barPct,100)}%;background:${barColor}"></div></div></div>`:''}
+    </div>
+    <div class="det-r">
+      <div class="det-amt blur-amt" style="color:${barColor||'#fff'}">${amt}</div>
+      <div class="det-pct">${pct}</div>
+      <div class="det-aud blur-amt">${aud}</div>
+    </div>
+  </div>`;
+const detNote = (html,color) => `<div class="det-note" style="background:${color}10;border:1px solid ${color}28;">${html}</div>`;
+
+function DETAIL_DATA(key) {
+  const cash=W('i-cash'), investL=W('i-invest-long'), investS=W('i-invest-short'),
+        parking=W('i-parking'), jeonse=W('i-jeonse'), loan=W('i-loan'),
+        doakye=W('i-doakye'), chungak=W('i-chungak'),
+        interest=W('i-interest'), gov=W('i-gov'), rate=W('i-rate');
+  const cashOther=cash-jeonse-doakye-chungak;
+  const cashPure=cashOther-parking;
+  const opsTotal=doakye+investL+investS+parking+cashPure+chungak;
+  const receipt=doakye+interest+gov;
+
+  if(key==='doakye') return { title:'청년도약계좌 — 정책저축', color:'#A78BFA', html:
+    detRow('📅','rgba(167,139,250,.15)','가입일','2024년 3월 18일','2024.03.18','','','',0)
+   +detRow('🔄','rgba(167,139,250,.15)','월 납입','매월 자동이체',fx(700000),'','','#A78BFA',100)
+   +detRow('🔢','rgba(167,139,250,.15)','납입 회차','누적','27회차','','','',0)
+   +detRow('💰','rgba(167,139,250,.15)','납입 원금','27회분',fx(doakye),pc(doakye,opsTotal),au(doakye,rate),'#A78BFA',100)
+   +'<div style="height:1px;background:var(--border);margin:5px 0;"></div>'
+   +detRow('📈','rgba(74,222,128,.12)','납입 원금','',fx(doakye),pc(doakye,receipt),au(doakye,rate),'#A78BFA',doakye/receipt*100)
+   +detRow('💸','rgba(74,222,128,.12)','이자','',fx(interest),pc(interest,receipt),au(interest,rate),'#4ADE80',interest/receipt*100)
+   +detRow('🏛️','rgba(74,222,128,.12)','정부기여금','',fx(gov),pc(gov,receipt),au(gov,rate),'#4ADE80',gov/receipt*100)
+   +`<div class="det-row" style="background:rgba(46,207,189,.08);border-color:rgba(46,207,189,.25);">
+      <div class="det-icon" style="background:rgba(46,207,189,.18)">🎯</div>
+      <div class="det-info"><div class="det-name" style="color:var(--teal)">총 수령 예상</div></div>
+      <div class="det-r"><div class="det-amt blur-amt" style="color:var(--teal)">${fx(receipt)}</div><div class="det-aud blur-amt">${au(receipt,rate)}</div></div>
+     </div>`
+   +detNote('<b>이전 계획</b> — ISA 중개형 납입 후 ETF 전환. 리밸런싱(총액 불변).','#A78BFA')
+  };
+
+  if(key==='invest-long') return { title:'장기 ETF·주식 — 인덱스 투자', color:'#2ECFBD', html:
+    detRow('📊','rgba(46,207,189,.15)','위탁계좌','한국투자증권 일반 매매',fx(9369633),pc(9369633,investL),au(9369633,rate),'#2ECFBD',9369633/investL*100)
+   +detRow('🏦','rgba(74,158,255,.15)','ISA 장기ETF','서민형 · 비과세 (장기 보유분)',fx(investL-9369633>0?investL-9369633:0),'',au(investL-9369633,rate),'#4A9EFF',Math.max(0,(investL-9369633)/investL*100))
+   +detNote('<b>투자 스타일</b> — 인덱스 ETF 중심 · 적립식 · 장기 5년+ 보유. ISA 단기채권ETF와 별도 관리.','#2ECFBD')
+  };
+
+  if(key==='invest-short') return { title:'ISA 단기채권 ETF — 단기 대기자금', color:'#818CF8', html:
+    detRow('📋','rgba(129,140,248,.15)','종목','KODEX 단기채권PLUS (214980)','214980','','','#818CF8',100)
+   +detRow('🔢','rgba(129,140,248,.15)','매수 수량','40주 × 114,510원','40주','','','',0)
+   +detRow('💰','rgba(129,140,248,.15)','총 매수금액','ISA 서민형 내 보유',fx(investS),pc(investS,opsTotal),au(investS,rate),'#818CF8',100)
+   +detRow('📅','rgba(129,140,248,.15)','운용 기간','6개월 이상 단기 거치 예정','D+2 영업일','','','',0)
+   +detNote('<b>성격</b> — 단기채권 ETF (현금 대체성 자산). 장기 주식ETF 아님. 출국 전 비용·초기정착비 용도 아님. 필요시 매도 가능.','#818CF8')
+  };
+
+  if(key==='parking') return { title:'파킹통장 — 단기 현금성 자산', color:'#F59E0B', html:
+    detRow('🏦','rgba(245,158,11,.15)','계좌명','OK짠테크통장Ⅱ',fx(parking),pc(parking,opsTotal),au(parking,rate),'#F59E0B',100)
+   +detRow('⚡','rgba(245,158,11,.12)','우대조건','4대페이 등록 완료','완료','','','',0)
+   +detRow('📅','rgba(245,158,11,.12)','운용 기간','6개월 이상 단기 거치 예정','500만원 한도','','','',0)
+   +detNote('<b>메모</b> — 500만원까지 금리 효율 최적. 기타현금에서 이동. 출국 전 비용·초기정착비 용도 아님.','#F59E0B')
+  };
+
+  if(key==='cash2') return { title:'기타현금·유동', color:'#4ADE80', html:
+    detRow('🏧','rgba(74,222,128,.12)','생활비·입출금','일상 지출',fx(cashPure),pc(cashPure,opsTotal),au(cashPure,rate),'#4ADE80',100)
+   +'<div style="height:1px;background:var(--border);margin:5px 0;"></div>'
+   +`<div style="font-size:9.5px;color:var(--w30);padding:0 4px;margin-bottom:3px;">계좌·현금 ${fx(cash)} 전체 구성</div>`
+   +detRow('🏠','rgba(148,163,184,.10)','전세보증금','',fx(jeonse),pc(jeonse,cash),au(jeonse,rate),'#94A3B8',jeonse/cash*100)
+   +detRow('🟣','rgba(167,139,250,.10)','청년도약계좌','',fx(doakye),pc(doakye,cash),au(doakye,rate),'#A78BFA',doakye/cash*100)
+   +detRow('🅾️','rgba(245,158,11,.10)','파킹통장(OK짠테크)','단기 대기자금',fx(parking),pc(parking,cash),au(parking,rate),'#F59E0B',parking/cash*100)
+   +detRow('🔵','rgba(74,158,255,.10)','청약통장','',fx(chungak),pc(chungak,cash),au(chungak,rate),'#4A9EFF',chungak/cash*100)
+   +detRow('🟢','rgba(74,222,128,.10)','기타현금','',fx(cashPure),pc(cashPure,cash),au(cashPure,rate),'#4ADE80',cashPure/cash*100)
+   +detNote(`즉시 사용 가능 순수 현금 <b>${fx(cashPure)}</b>. 파킹·ISA단기채권은 단기 대기자금으로 별도 분류.`,'#4ADE80')
+  };
+
+  if(key==='chungak') return { title:'청년주택드림 청약통장', color:'#4A9EFF', html:
+    detRow('🏠','rgba(74,158,255,.15)','상품명','청년주택드림 청약통장','청약통장','','','#4A9EFF',100)
+   +detRow('💰','rgba(74,158,255,.15)','누적 잔액','',fx(chungak),pc(chungak,opsTotal),au(chungak,rate),'#4A9EFF',100)
+   +detNote('주택 청약 예적금성 자산. 장기 보유, 단기 해지 계획 없음.','#4A9EFF')
+  };
+
+  return null;
+}
+
+function showDetail(key) {
+  currentKey = key;
+  const data = DETAIL_DATA(key);
+  if(!data) return;
+  document.querySelectorAll('.leg-row').forEach(r=>r.classList.remove('active'));
+  const lr=$('lr-'+key); if(lr) lr.classList.add('active');
+  const titleEl=$('det-title');
+  if(titleEl){ titleEl.textContent=data.title; titleEl.style.color=data.color; }
+  const bodyEl=$('det-body');
+  if(bodyEl) bodyEl.innerHTML=data.html;
+}
+
+['doakye','invest-long','invest-short','parking','cash2','chungak'].forEach(key=>{
+  const el=$('lr-'+key);
+  if(el) el.addEventListener('click', ()=>showDetail(key));
+});
+
+// ══ INPUT EVENTS ══
+document.querySelectorAll('.inp-field').forEach(el=>el.addEventListener('input', update));
+const rb=$('reset-btn');
+if(rb) rb.addEventListener('click', ()=>{
+  Object.entries(DEFAULTS).forEach(([k,v])=>{ const el=$('i-'+k); if(el) el.value=v; });
+  update();
+});
+
+// ══ AMOUNT TOGGLE ══
+let amtsVisible = false;
+function applyToggle(){
+  const icon=$('toggle-icon'), label=$('toggle-label'), tog=$('amt-toggle');
+  if(amtsVisible){
+    document.body.classList.remove('hide');
+    if(tog) tog.classList.add('on');
+    if(icon) icon.textContent='👁️';
+    if(label) label.textContent='금액 표시 중';
+  } else {
+    document.body.classList.add('hide');
+    if(tog) tog.classList.remove('on');
+    if(icon) icon.textContent='🙈';
+    if(label) label.textContent='금액 숨김';
+  }
+}
+const toggleEl=$('amt-toggle');
+if(toggleEl) toggleEl.addEventListener('click', e=>{ e.stopPropagation(); amtsVisible=!amtsVisible; applyToggle(); });
+
+// ══ SIDEBAR TOGGLE ══
+let sidebarOpen = false;
+function applySidebar(){ document.body.classList.toggle('sidebar-open', sidebarOpen); }
+const sidebarTab=$('sidebar-tab');
+if(sidebarTab) sidebarTab.addEventListener('click', e=>{ e.stopPropagation(); sidebarOpen=!sidebarOpen; applySidebar(); });
+
+// ══ INIT ══
+update();
+applyToggle();
+applySidebar();
+
+}); // end DOMContentLoaded
+</script>
+
+<!-- ══ PASSWORD GATE ══ -->
+<div class="pw-gate" id="pw-gate">
+  <div class="pw-box">
+    <div style="font-size:28px;">🔐</div>
+    <div class="pw-title">Financial Portfolio</div>
+    <div class="pw-sub">비밀번호를 입력하세요</div>
+    <input class="pw-input" id="pw-input" type="password" placeholder="••••••••" maxlength="20">
+    <div class="pw-err" id="pw-err">비밀번호가 틀렸습니다</div>
+    <button class="pw-btn" id="pw-submit">확인</button>
+  </div>
+</div>
+
+<!-- ══ HISTORY TOGGLE ══ -->
+<button class="hist-btn" id="hist-btn">
+  <span>📋</span> 투자 히스토리
+  <span id="hist-arrow" style="transition:transform .3s;">▲</span>
+</button>
+
+<div class="hist-panel" id="hist-panel">
+  <div class="hist-inner">
+    <div class="hist-title">Investment History — 주요 자금 이동 & 투자 현황</div>
+    <div class="hist-list">
+
+      <div class="hist-item">
+        <div class="hist-date">2024.03.18</div>
+        <div class="hist-desc"><span class="hist-tag" style="background:rgba(167,139,250,.15);color:#A78BFA;">정책저축</span><b>청년도약계좌 가입</b> — 월 70만원, 현재 27회차 납입</div>
+        <div class="hist-amt">누적 1,960만원</div>
+      </div>
+
+      <div class="hist-item">
+        <div class="hist-date">2026.06.26</div>
+        <div class="hist-desc"><span class="hist-tag" style="background:rgba(245,158,11,.15);color:#F59E0B;">파킹통장</span><b>OK짠테크II 입금</b> — 6개월 이상 단기 거치, 4대페이 우대조건 완료</div>
+        <div class="hist-amt">+5,000,000원</div>
+      </div>
+
+      <div class="hist-item">
+        <div class="hist-date">2026.06.26</div>
+        <div class="hist-desc"><span class="hist-tag" style="background:rgba(129,140,248,.15);color:#818CF8;">단기채권</span><b>ISA KODEX 단기채권PLUS 매수</b> — 40주 @ 114,510원, 6개월 거치</div>
+        <div class="hist-amt">4,580,400원</div>
+      </div>
+
+      <div class="hist-item">
+        <div class="hist-date">2026.07.03</div>
+        <div class="hist-desc"><span class="hist-tag" style="background:rgba(248,113,113,.15);color:#F87171;">매도</span><b>BRK/B 전부 매도</b> — 5.178841주 @ $505.45, 환율 1,525.72원, 수수료 9,984원</div>
+        <div class="hist-amt plus">+3,983,809원</div>
+      </div>
+
+      <div class="hist-item">
+        <div class="hist-date">2026.07.03</div>
+        <div class="hist-desc"><span class="hist-tag" style="background:rgba(248,113,113,.15);color:#F87171;">매도</span><b>SPY 전부 매도</b> — 0.207482주 @ $748.6, 환율 1,525.72원, 수수료 592원<br><small style="color:rgba(255,255,255,.3);">연간 250만원 비과세 한도 활용 절세 매도</small></div>
+        <div class="hist-amt plus">+236,384원</div>
+      </div>
+
+      <div class="hist-item" style="border-color:rgba(245,158,11,.2);background:rgba(245,158,11,.04);">
+        <div class="hist-date">2026.07.09<br><span style="color:#F59E0B;font-size:9px;">예약매수</span></div>
+        <div class="hist-desc"><span class="hist-tag" style="background:rgba(46,207,189,.15);color:#2ECFBD;">장기투자</span><b>RISE 미국나스닥100 예약매수</b> — 138주 @ 32,195원 (ISA 중개형)<br><small style="color:rgba(255,255,255,.3);">BRK/B + SPY 매도대금으로 나스닥 ETF 전환 (QQQ 직투 → 국내 ETF ISA)</small></div>
+        <div class="hist-amt pending">4,442,910원</div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+</body>
+</html>
