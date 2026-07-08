@@ -454,6 +454,21 @@ body:not(.hide) .blur-amt{filter:none;transition:filter .3s;}
         <div class="inp-row"><div class="inp-lbl">저축 개월 수</div><input class="inp-field" id="i-whol-months" type="number" value="3"></div>
       </div>
 
+
+      <div style="display:flex;flex-direction:column;gap:6px;">
+        <div class="inp-sec-lbl">보유 종목 수량 (실시간 시세 연동)</div>
+        <div class="inp-row"><div class="inp-lbl">KODEX 단기채권PLUS <small>214980.KS</small></div>
+          <input class="inp-field" id="h-kodex" type="number" value="40" placeholder="주"></div>
+        <div class="inp-row"><div class="inp-lbl">TIGER 미국S&P500 <small>360750.KS</small></div>
+          <input class="inp-field c-teal" id="h-tiger-sp" type="number" value="0" placeholder="주"></div>
+        <div class="inp-row"><div class="inp-lbl">RISE 미국나스닥100 <small>368590.KS</small></div>
+          <input class="inp-field c-teal" id="h-rise" type="number" value="138" placeholder="주"></div>
+        <div class="inp-row"><div class="inp-lbl">TIME 나스닥100액티브 <small>396810.KS</small></div>
+          <input class="inp-field" id="h-time" type="number" value="0" placeholder="주"></div>
+        <div class="inp-row"><div class="inp-lbl">QQQ (위탁·미국) <small>QQQ</small></div>
+          <input class="inp-field c-purple" id="h-qqq" type="number" value="0" placeholder="주"></div>
+      </div>
+
       <div style="display:flex;flex-direction:column;gap:6px;">
         <div class="inp-sec-lbl">환율</div>
         <div class="inp-row"><div class="inp-lbl">1 AUD = ? KRW</div><input class="inp-field" id="i-rate" type="number" value="1068"></div>
@@ -736,6 +751,155 @@ body:not(.hide) .blur-amt{filter:none;transition:filter .3s;}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
 
+
+// ══ HOLDINGS — 실시간 가격 ══
+const HOLDINGS = {
+  'invest-long': [
+    { id:'h-qqq',   name:'QQQ',               sub:'나스닥100 직투 · 위탁',   ticker:'QQQ',       qty:0,   avgCost:0,      badge:'위탁',  bc:'rgba(46,207,189,.15)', btc:'#2ECFBD' },
+    { id:'h-rise',  name:'RISE 미국나스닥100', sub:'368590 · ISA 중개형',    ticker:'368590.KS', qty:154, avgCost:32195,  badge:'ISA',   bc:'rgba(74,158,255,.15)', btc:'#4A9EFF' },
+    { id:'h-tiger', name:'TIGER 미국S&P500',   sub:'360750 · ISA 중개형',    ticker:'360750.KS', qty:0,   avgCost:0,      badge:'ISA',   bc:'rgba(74,158,255,.15)', btc:'#4A9EFF' },
+    { id:'h-time',  name:'TIME 나스닥100액티브',sub:'451590 · ISA 중개형',   ticker:'451590.KS', qty:0,   avgCost:0,      badge:'ISA',   bc:'rgba(74,158,255,.15)', btc:'#4A9EFF' },
+  ],
+  'invest-short': [
+    { id:'h-kodex', name:'KODEX 단기채권PLUS', sub:'214980 · ISA 중개형',    ticker:'214980.KS', qty:40,  avgCost:114510, badge:'ISA',   bc:'rgba(129,140,248,.15)', btc:'#818CF8' },
+  ]
+};
+
+let priceCache = {};
+
+async function fetchPrice(ticker){
+  if(priceCache[ticker] && Date.now()-priceCache[ticker].ts < 60000) return priceCache[ticker].price;
+  try{
+    const encoded = encodeURIComponent(`https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=1d`);
+    const res = await fetch(`https://api.allorigins.win/get?url=${encoded}`, {signal:AbortSignal.timeout(8000)});
+    const json = await res.json();
+    const data = JSON.parse(json.contents);
+    const price = data?.chart?.result?.[0]?.meta?.regularMarketPrice;
+    if(price){ priceCache[ticker]={price, ts:Date.now()}; return price; }
+  } catch(e){}
+  return null;
+}
+
+function buildHoldingsTable(key, refreshFn){
+  const items = HOLDINGS[key];
+  if(!items || items.length===0) return '';
+
+  const rows = items.map(h=>`
+    <tr>
+      <td>
+        <div class="hold-name">
+          <span class="hold-badge" style="background:${h.bc};color:${h.btc}">${h.badge}</span>
+          ${h.name}
+        </div>
+        <div class="hold-sub">${h.sub}</div>
+      </td>
+      <td>
+        <input class="hold-qty-inp blur-amt" id="qty-${h.id}" type="number" value="${h.qty}"
+          onchange="updateHoldRow('${h.id}','${h.ticker}',${h.avgCost})">
+      </td>
+      <td class="hold-price" id="price-${h.id}">조회중…</td>
+      <td class="hold-value blur-amt" id="val-${h.id}">—</td>
+      <td class="hold-pnl zero" id="pnl-${h.id}">—</td>
+    </tr>
+  `).join('');
+
+  return `
+    <div class="hold-header">
+      <div class="hold-title">📊 보유 종목 (수량 수정 가능)</div>
+      <div class="hold-refresh" id="refresh-${key}" onclick="${refreshFn}">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+        실시간 갱신
+      </div>
+    </div>
+    <table class="hold-table">
+      <thead><tr>
+        <th style="text-align:left;">종목</th>
+        <th>수량</th>
+        <th>현재가</th>
+        <th>평가금액</th>
+        <th>손익</th>
+      </tr></thead>
+      <tbody id="hold-body-${key}">${rows}</tbody>
+      <tfoot><tr class="hold-total-row">
+        <td colspan="3">합계</td>
+        <td class="blur-amt" id="hold-total-val-${key}">—</td>
+        <td class="hold-pnl" id="hold-total-pnl-${key}">—</td>
+      </tr></tfoot>
+    </table>
+    <div class="api-note">⏱ Yahoo Finance · 최대 1분 캐시 · 장 마감 후 종가 기준</div>
+  `;
+}
+
+async function loadHoldingPrices(key){
+  const items = HOLDINGS[key];
+  if(!items) return;
+  const btn = document.getElementById(`refresh-${key}`);
+  if(btn) btn.classList.add('spinning');
+
+  let totalVal=0, totalCost=0;
+  await Promise.all(items.map(async h=>{
+    const qty = parseInt(document.getElementById(`qty-${h.id}`)?.value||'0')||0;
+    const price = await fetchPrice(h.ticker);
+    const priceEl = document.getElementById(`price-${h.id}`);
+    const valEl   = document.getElementById(`val-${h.id}`);
+    const pnlEl   = document.getElementById(`pnl-${h.id}`);
+    if(!priceEl) return;
+
+    if(price){
+      const val  = price * qty;
+      const cost = h.avgCost * qty;
+      const pnl  = val - cost;
+      const pnlPct = cost > 0 ? pnl/cost*100 : 0;
+      totalVal  += val;
+      totalCost += cost;
+
+      // KRW 변환 (한국 ETF는 원화, 미국 ETF는 달러)
+      const isKR = h.ticker.endsWith('.KS');
+      const rate = W('i-rate');
+      const priceKRW = isKR ? price : price * rate;
+      const valKRW   = isKR ? val   : val   * rate;
+      const pnlKRW   = isKR ? pnl   : pnl   * rate;
+
+      priceEl.textContent = isKR
+        ? Math.round(priceKRW).toLocaleString('ko-KR')+'원'
+        : '$'+price.toFixed(2)+` (${Math.round(priceKRW).toLocaleString()}원)`;
+      priceEl.className = 'hold-price';
+
+      valEl.textContent = Math.round(valKRW).toLocaleString('ko-KR')+'원';
+
+      if(h.avgCost>0){
+        const cls = pnl>0?'plus':pnl<0?'minus':'zero';
+        pnlEl.textContent = (pnl>=0?'+':'')+Math.round(pnlKRW).toLocaleString('ko-KR')+'원 ('+pnlPct.toFixed(1)+'%)';
+        pnlEl.className = `hold-pnl ${cls}`;
+      } else {
+        pnlEl.textContent = '—';
+        pnlEl.className = 'hold-pnl zero';
+      }
+    } else {
+      priceEl.textContent = '조회 실패';
+      priceEl.className = 'hold-price loading';
+    }
+  }));
+
+  // 합계
+  const rate = W('i-rate');
+  const tvEl = document.getElementById(`hold-total-val-${key}`);
+  const tpEl = document.getElementById(`hold-total-pnl-${key}`);
+  if(tvEl) tvEl.textContent = Math.round(totalVal).toLocaleString('ko-KR')+'원';
+  if(tpEl){
+    const totalPnl = totalVal - totalCost;
+    const cls = totalPnl>0?'plus':totalPnl<0?'minus':'zero';
+    tpEl.textContent = totalCost>0 ? (totalPnl>=0?'+':'')+Math.round(totalPnl).toLocaleString('ko-KR')+'원' : '—';
+    tpEl.className = `hold-pnl ${cls}`;
+  }
+  if(btn) btn.classList.remove('spinning');
+}
+
+function updateHoldRow(id, ticker, avgCost){
+  // 수량 변경 시 해당 row만 업데이트
+  loadHoldingPrices(id.startsWith('h-kodex') ? 'invest-short' : 'invest-long');
+}
+
 const $ = id => document.getElementById(id);
 const W = id => { const el=$(id); return el ? Number(el.value)||0 : 0; };
 const fx = n  => Math.round(n).toLocaleString('ko-KR')+'원';
@@ -965,17 +1129,15 @@ function DETAIL_DATA(key) {
   };
 
   if(key==='invest-long') return { title:'장기 ETF·주식 — 인덱스 투자', color:'#2ECFBD', html:
-    detRow('📊','rgba(46,207,189,.15)','위탁계좌','한국투자증권 일반 매매',fx(9369633),pc(9369633,investL),au(9369633,rate),'#2ECFBD',9369633/investL*100)
-   +detRow('🏦','rgba(74,158,255,.15)','ISA 장기ETF','서민형 · 비과세 (장기 보유분)',fx(investL-9369633>0?investL-9369633:0),'',au(investL-9369633,rate),'#4A9EFF',Math.max(0,(investL-9369633)/investL*100))
-   +detNote('<b>투자 스타일</b> — 인덱스 ETF 중심 · 적립식 · 장기 5년+ 보유. ISA 단기채권ETF와 별도 관리.','#2ECFBD')
+    buildHoldingsTable('invest-long', "loadHoldingPrices('invest-long')")
+   +detNote('<b>투자 스타일</b> — 인덱스 ETF 중심 · 적립식 · 장기 5년+ 보유. ISA 단기채권ETF와 별도 관리.','#2ECFBD'),
+   afterRender: ()=>loadHoldingPrices('invest-long')
   };
 
   if(key==='invest-short') return { title:'ISA 단기채권 ETF — 단기 대기자금', color:'#818CF8', html:
-    detRow('📋','rgba(129,140,248,.15)','종목','KODEX 단기채권PLUS (214980)','214980','','','#818CF8',100)
-   +detRow('🔢','rgba(129,140,248,.15)','매수 수량','40주 × 114,510원','40주','','','',0)
-   +detRow('💰','rgba(129,140,248,.15)','총 매수금액','ISA 서민형 내 보유',fx(investS),pc(investS,opsTotal),au(investS,rate),'#818CF8',100)
-   +detRow('📅','rgba(129,140,248,.15)','운용 기간','6개월 이상 단기 거치 예정','D+2 영업일','','','',0)
-   +detNote('<b>성격</b> — 단기채권 ETF (현금 대체성 자산). 장기 주식ETF 아님. 출국 전 비용·초기정착비 용도 아님. 필요시 매도 가능.','#818CF8')
+    buildHoldingsTable('invest-short', "loadHoldingPrices('invest-short')")
+   +detNote('<b>성격</b> — 단기채권 ETF (현금 대체성 자산). 장기 주식ETF 아님. 출국 전 비용·초기정착비 용도 아님. 필요시 매도 가능.','#818CF8'),
+   afterRender: ()=>loadHoldingPrices('invest-short')
   };
 
   if(key==='parking') return { title:'파킹통장 — 단기 현금성 자산', color:'#F59E0B', html:
@@ -1016,6 +1178,7 @@ function showDetail(key) {
   if(titleEl){ titleEl.textContent=data.title; titleEl.style.color=data.color; }
   const bodyEl=$('det-body');
   if(bodyEl) bodyEl.innerHTML=data.html;
+  if(data.afterRender) setTimeout(data.afterRender, 50);
 }
 
 ['doakye','invest-long','invest-short','parking','cash2','chungak'].forEach(key=>{
