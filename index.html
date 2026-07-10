@@ -769,14 +769,34 @@ let priceCache = {};
 
 async function fetchPrice(ticker){
   if(priceCache[ticker] && Date.now()-priceCache[ticker].ts < 60000) return priceCache[ticker].price;
-  try{
-    const encoded = encodeURIComponent(`https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=1d`);
-    const res = await fetch(`https://api.allorigins.win/get?url=${encoded}`, {signal:AbortSignal.timeout(8000)});
-    const json = await res.json();
-    const data = JSON.parse(json.contents);
-    const price = data?.chart?.result?.[0]?.meta?.regularMarketPrice;
-    if(price){ priceCache[ticker]={price, ts:Date.now()}; return price; }
-  } catch(e){}
+
+  const yahooUrls = [
+    `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=1d`,
+    `https://query2.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=1d`,
+  ];
+
+  // [proxyFn, isWrapped(allorigins style)]
+  const proxyDefs = [
+    [u => `https://corsproxy.io/?${encodeURIComponent(u)}`,                    false],
+    [u => `https://api.allorigins.win/get?url=${encodeURIComponent(u)}`,       true ],
+    [u => `https://api.codetabs.com/v1/proxy/?quest=${encodeURIComponent(u)}`, false],
+  ];
+
+  for(const [mkProxy, isWrapped] of proxyDefs){
+    for(const yUrl of yahooUrls){
+      try{
+        const ctrl = new AbortController();
+        const tid = setTimeout(()=>ctrl.abort(), 8000);
+        const res = await fetch(mkProxy(yUrl), {signal: ctrl.signal});
+        clearTimeout(tid);
+        if(!res.ok) continue;
+        const raw = await res.json();
+        const data = isWrapped ? JSON.parse(raw.contents) : raw;
+        const price = data?.chart?.result?.[0]?.meta?.regularMarketPrice;
+        if(price != null){ priceCache[ticker]={price, ts:Date.now()}; return price; }
+      } catch(e){}
+    }
+  }
   return null;
 }
 
