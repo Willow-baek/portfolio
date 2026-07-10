@@ -460,13 +460,13 @@ body:not(.hide) .blur-amt{filter:none;transition:filter .3s;}
         <div class="inp-row"><div class="inp-lbl">KODEX 단기채권PLUS <small>214980.KS</small></div>
           <input class="inp-field" id="h-kodex" type="number" value="40" placeholder="주"></div>
         <div class="inp-row"><div class="inp-lbl">TIGER 미국S&P500 <small>360750.KS</small></div>
-          <input class="inp-field c-teal" id="h-tiger-sp" type="number" value="0" placeholder="주"></div>
+          <input class="inp-field c-teal" id="h-tiger-sp" type="number" value="90" placeholder="주"></div>
         <div class="inp-row"><div class="inp-lbl">RISE 미국나스닥100 <small>368590.KS</small></div>
-          <input class="inp-field c-teal" id="h-rise" type="number" value="138" placeholder="주"></div>
+          <input class="inp-field c-teal" id="h-rise" type="number" value="16" placeholder="주"></div>
         <div class="inp-row"><div class="inp-lbl">TIME 나스닥100액티브 <small>396810.KS</small></div>
           <input class="inp-field" id="h-time" type="number" value="0" placeholder="주"></div>
         <div class="inp-row"><div class="inp-lbl">QQQ (위탁·미국) <small>QQQ</small></div>
-          <input class="inp-field c-purple" id="h-qqq" type="number" value="0" placeholder="주"></div>
+          <input class="inp-field c-purple" id="h-qqq" type="number" value="4.301972" step="0.000001" placeholder="주"></div>
       </div>
 
       <div style="display:flex;flex-direction:column;gap:6px;">
@@ -755,10 +755,10 @@ document.addEventListener('DOMContentLoaded', function() {
 // ══ HOLDINGS — 실시간 가격 ══
 const HOLDINGS = {
   'invest-long': [
-    { id:'h-qqq',   name:'QQQ',               sub:'나스닥100 직투 · 위탁',   ticker:'QQQ',       qty:0,   avgCost:0,      badge:'위탁',  bc:'rgba(46,207,189,.15)', btc:'#2ECFBD' },
-    { id:'h-rise',  name:'RISE 미국나스닥100', sub:'368590 · ISA 중개형',    ticker:'368590.KS', qty:154, avgCost:32195,  badge:'ISA',   bc:'rgba(74,158,255,.15)', btc:'#4A9EFF' },
-    { id:'h-tiger', name:'TIGER 미국S&P500',   sub:'360750 · ISA 중개형',    ticker:'360750.KS', qty:0,   avgCost:0,      badge:'ISA',   bc:'rgba(74,158,255,.15)', btc:'#4A9EFF' },
-    { id:'h-time',  name:'TIME 나스닥100액티브',sub:'451590 · ISA 중개형',   ticker:'451590.KS', qty:0,   avgCost:0,      badge:'ISA',   bc:'rgba(74,158,255,.15)', btc:'#4A9EFF' },
+    { id:'h-qqq',   name:'QQQ',               sub:'나스닥100 직투 · 위탁',   ticker:'QQQ',       qty:4.301972, avgCost:0,      badge:'위탁',  bc:'rgba(46,207,189,.15)', btc:'#2ECFBD' },
+    { id:'h-rise',  name:'RISE 미국나스닥100', sub:'368590 · ISA 중개형',    ticker:'368590.KS', qty:16,       avgCost:32195,  badge:'ISA',   bc:'rgba(74,158,255,.15)', btc:'#4A9EFF' },
+    { id:'h-tiger', name:'TIGER 미국S&P500',   sub:'360750 · ISA 중개형',    ticker:'360750.KS', qty:90,       avgCost:0,      badge:'ISA',   bc:'rgba(74,158,255,.15)', btc:'#4A9EFF' },
+    { id:'h-time',  name:'TIME 나스닥100액티브',sub:'396810 · ISA 중개형',   ticker:'396810.KS', qty:0,        avgCost:0,      badge:'ISA',   bc:'rgba(74,158,255,.15)', btc:'#4A9EFF' },
   ],
   'invest-short': [
     { id:'h-kodex', name:'KODEX 단기채권PLUS', sub:'214980 · ISA 중개형',    ticker:'214980.KS', qty:40,  avgCost:114510, badge:'ISA',   bc:'rgba(129,140,248,.15)', btc:'#818CF8' },
@@ -858,7 +858,7 @@ async function loadHoldingPrices(key){
 
   let totalVal=0, totalCost=0;
   await Promise.all(items.map(async h=>{
-    const qty = parseInt(document.getElementById(`qty-${h.id}`)?.value||'0')||0;
+    const qty = parseFloat(document.getElementById(`qty-${h.id}`)?.value||'0')||0;
     const price = await fetchPrice(h.ticker);
     const priceEl = document.getElementById(`price-${h.id}`);
     const valEl   = document.getElementById(`val-${h.id}`);
